@@ -53,6 +53,6 @@ app.get("/orders/:id", (req, res) => {
   res.json(order);
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`Order Service running on http://localhost:${PORT}`);
 });
