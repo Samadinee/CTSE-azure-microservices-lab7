@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL ||
-  (import.meta.env.DEV ? "http://localhost:5000" : "");
+const configuredApiBase = import.meta.env.VITE_API_BASE_URL?.trim();
+const useLocalDevApi = import.meta.env.DEV && !configuredApiBase;
+const canCallApi = Boolean(configuredApiBase) || useLocalDevApi;
+const API_BASE = configuredApiBase || (useLocalDevApi ? "http://localhost:5000" : "");
 
 export default function App() {
   const [services, setServices] = useState([]);
@@ -15,6 +16,14 @@ export default function App() {
 
   const loadData = async () => {
     setErrorMessage("");
+
+    if (!canCallApi) {
+      setLoading(false);
+      setErrorMessage(
+        "API base URL is not configured for deployment. Set VITE_API_BASE_URL to your public gateway URL.",
+      );
+      return;
+    }
 
     try {
       const [statusRes, productsRes, ordersRes] = await Promise.all([
