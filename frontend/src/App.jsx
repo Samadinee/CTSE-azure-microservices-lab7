@@ -26,30 +26,69 @@ export default function App() {
     }
 
     try {
-      const [statusRes, productsRes, ordersRes] = await Promise.all([
-        fetch(buildApiUrl("/api/status")),
-        fetch(buildApiUrl("/api/products")),
-        fetch(buildApiUrl("/api/orders")),
+      const fetchJson = async (path, label) => {
+        const response = await fetch(buildApiUrl(path));
+        let payload = null;
+
+        try {
+          payload = await response.json();
+        } catch {
+          payload = null;
+        }
+
+        if (!response.ok) {
+          const message =
+            payload?.message || payload?.error || `Request failed with status ${response.status}`;
+          throw new Error(`${label}: ${message}`);
+        }
+
+        return payload;
+      };
+
+      const [statusResult, productsResult, ordersResult] = await Promise.allSettled([
+        fetchJson("/api/status", "Status API"),
+        fetchJson("/api/products", "Products API"),
+        fetchJson("/api/orders", "Orders API"),
       ]);
 
-      if (!statusRes.ok || !productsRes.ok || !ordersRes.ok) {
-        throw new Error(
-          `API request failed (status: ${statusRes.status}/${productsRes.status}/${ordersRes.status})`,
-        );
+      const errors = [];
+
+      if (statusResult.status === "fulfilled") {
+        setServices(statusResult.value);
+
+        const downServices = statusResult.value
+          .filter((service) => service.status !== "running")
+          .map(
+            (service) =>
+              `${service.service || service.name}: ${service.error || "service is down"}`,
+          );
+
+        errors.push(...downServices);
+      } else {
+        setServices([]);
+        errors.push(statusResult.reason.message);
       }
 
-      const statusData = await statusRes.json();
-      const productsData = await productsRes.json();
-      const ordersData = await ordersRes.json();
+      if (productsResult.status === "fulfilled") {
+        setProducts(productsResult.value);
+      } else {
+        setProducts([]);
+        errors.push(productsResult.reason.message);
+      }
 
-      setServices(statusData);
-      setProducts(productsData);
-      setOrders(ordersData);
+      if (ordersResult.status === "fulfilled") {
+        setOrders(ordersResult.value);
+      } else {
+        setOrders([]);
+        errors.push(ordersResult.reason.message);
+      }
+
+      if (errors.length > 0) {
+        setErrorMessage(errors.join("\n"));
+      }
     } catch (error) {
       console.error("Error loading data:", error);
-      setErrorMessage(
-        "Unable to load API data. Configure VITE_API_BASE_URL for deployment or expose /api routes from the same host.",
-      );
+      setErrorMessage(`Unable to load API data: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -107,7 +146,11 @@ export default function App() {
           <>
             {errorMessage && (
               <section className="mb-4">
-                <div className="alert alert-danger mb-0" role="alert">
+                <div
+                  className="alert alert-danger mb-0"
+                  role="alert"
+                  style={{ whiteSpace: "pre-line" }}
+                >
                   {errorMessage}
                 </div>
               </section>
