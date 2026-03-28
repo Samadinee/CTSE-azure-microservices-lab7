@@ -1,20 +1,33 @@
 import { useEffect, useMemo, useState } from "react";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.DEV ? "http://localhost:5000" : "");
 
 export default function App() {
   const [services, setServices] = useState([]);
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const buildApiUrl = (path) => `${API_BASE}${path}`;
 
   const loadData = async () => {
+    setErrorMessage("");
+
     try {
       const [statusRes, productsRes, ordersRes] = await Promise.all([
-        fetch(`${API_BASE}/api/status`),
-        fetch(`${API_BASE}/api/products`),
-        fetch(`${API_BASE}/api/orders`),
+        fetch(buildApiUrl("/api/status")),
+        fetch(buildApiUrl("/api/products")),
+        fetch(buildApiUrl("/api/orders")),
       ]);
+
+      if (!statusRes.ok || !productsRes.ok || !ordersRes.ok) {
+        throw new Error(
+          `API request failed (status: ${statusRes.status}/${productsRes.status}/${ordersRes.status})`,
+        );
+      }
 
       const statusData = await statusRes.json();
       const productsData = await productsRes.json();
@@ -25,6 +38,9 @@ export default function App() {
       setOrders(ordersData);
     } catch (error) {
       console.error("Error loading data:", error);
+      setErrorMessage(
+        "Unable to load API data. Configure VITE_API_BASE_URL for deployment or expose /api routes from the same host.",
+      );
     } finally {
       setLoading(false);
     }
@@ -80,6 +96,14 @@ export default function App() {
           </div>
         ) : (
           <>
+            {errorMessage && (
+              <section className="mb-4">
+                <div className="alert alert-danger mb-0" role="alert">
+                  {errorMessage}
+                </div>
+              </section>
+            )}
+
             <section className="mb-4">
               <div className="row g-4">
                 <div className="col-md-4">
